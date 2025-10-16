@@ -19,7 +19,7 @@ namespace MySpace{
             // 将日志消息写到标准输出,定长输出
             void log(const std::string& data, size_t len) override {
                 //从0开始截取长度为len
-                std::string str(data, 0,len);
+                std::string str(data, 0, len);
                 std::cout << str.c_str()<< std::endl;
             }
     };
@@ -36,8 +36,8 @@ namespace MySpace{
             void log(const std::string& data, size_t len) override {
                 _ofs.write(data.c_str(), len);
                 if (_ofs.fail()) {
-        std::cerr << "Failed to write to file." << std::endl;
-    }
+                    std::cerr << "Failed to write to file." << std::endl;
+                }
             }
         private:
             std::string _pathname;
@@ -105,10 +105,40 @@ namespace MySpace{
     class SinkFactory {
         public:
             template<class T, class ...Args>
-            static std::shared_ptr<LogSink> create(Args&&... args) {
-                return std::make_shared<T>(std::forward<Args>(args)...);
+            static std::unique_ptr<LogSink> create(Args&&... args) {
+                return std::make_unique<T>(std::forward<Args>(args)...);
             }
     };
+    /*
+    * 使用示例与模板实例化说明：
+    * 
+    * 1. 标准输出 Sink（无参数）：
+    *    auto sink = SinkFactory::create<StdoutSink>();
+    *    
+    *    实例化后等价于：
+    *    static std::unique_ptr<LogSink> create() {
+    *        return std::make_unique<StdoutSink>();
+    *    }
+    * 
+    * 2. 文件输出 Sink（1个参数）：
+    *    auto sink = SinkFactory::create<FileSink>("app.log");
+    *    
+    *    实例化后等价于：
+    *    static std::unique_ptr<LogSink> create(const char*&& arg) {
+    *        return std::make_unique<FileSink>(std::forward<const char*>(arg));
+    *    }
+    * 
+    * 3. 滚动文件 Sink（2个参数）：
+    *    auto sink = SinkFactory::create<RollBySizeSink>("./logs/roll-", 1024 * 1024);
+    *    
+    *    实例化后等价于：
+    *    static std::unique_ptr<LogSink> create(const char*&& arg0, int&& arg1) {
+    *        return std::make_unique<RollBySizeSink>(
+    *            std::forward<const char*>(arg0),
+    *            std::forward<int>(arg1)
+    *        );
+    *    }
+    */
 
 
 }

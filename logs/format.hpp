@@ -14,65 +14,73 @@ namespace MySpace{
     public:
         virtual void format(std::ostream& out, LogMsg& msg) = 0;
     };
+    //日志主体消息
     class payloadFormatItem : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
             out<<msg._payload;
         }
     };
+    //日志等级
     class levelFormatItem : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
-            //日志等级在LogLevel域中定义
             //不能用to_string 没有定义这个枚举类型
             out<<LogLevel::toString(msg._level);
         }
     };
+    //时间格式化，将时间戳转为可读时间
     class ctimeFormatItem : public FormatItem{
         public:
         ctimeFormatItem(const std::string &fmt) 
             : fmt_time(fmt) 
         {}
         virtual void format(std::ostream& out, LogMsg& msg) override {
-            struct tm t;
-            localtime_r(&msg._ctime, &t);
+            struct tm t;//存储时间信息
+            localtime_r(&msg._ctime, &t);//将时间戳转为本地时间
             char buff[32] = {0};
-            strftime(buff, sizeof(buff), fmt_time.c_str(), &t);
+            strftime(buff, sizeof(buff), fmt_time.c_str(), &t);//将本地时间转化为指定格式，存入buff
             out << buff;
         }
         private: 
-            std::string fmt_time; // %H:%M:%S
+            std::string fmt_time; // 指定时间格式，如%H:%M:%S
     };
+    //源文件名
     class fileFormatItem : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
             out<<msg._file;
         }
     };
+    //源文件行号
     class lineFormatItem : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
             out<<std::to_string(msg._line);
         }
     };
+    //线程ID
     class tidFormatItem : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
             out<<msg._tid;
         }
     };
+    //日志器名称
     class loggerFormatItem : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
             out<<msg._logger;
         }
     };
+    //制表符缩进
     class TabFormatItem  : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
             out<<'\t';
         }
     };
+    //换行
     class NewLineFormatItem  : public FormatItem{
         public:
         virtual void format(std::ostream& out, LogMsg& msg) override{
@@ -92,16 +100,16 @@ namespace MySpace{
             std::string _str;
     };
     /* 
-        %d  表示日期，    子格式 {%H:%M:%S} 
-        %t  表示鲜橙ID 
-        %c  表示日志器名称
-        %f  表示源码文件名
-        %l  表示源码行号
-        %p  表示日志级别
-        %T  表示制表符缩进
-        %m  表示主体消息
-        %n  表示换行
-    */
+        %d  表示日期，    子格式 {%H:%M:%S}， [%d{%H:%M:%S}] → [12:30:45]
+        %t  表示线程ID ， [%t] → [1234567890]
+        %c  表示日志器名称， [%c] → [sync_logger]
+        %f  表示源码文件名， [%f] → [main.cpp]
+        %l  表示源码行号， [%l] → [123]
+        %p  表示日志级别， [%p] → [INFO]
+        %T  表示制表符缩进，
+        %m  表示主体消息， 
+        %n  表示换行， 
+    *///解析格式化字符串，足额和多个FormatItem对象
     class Formatter{
         public:
             Formatter(const std::string& pattern = "[%d{%H:%M:%S}][%t][%c][%f:%l][%p]%T%m%n")
@@ -109,18 +117,38 @@ namespace MySpace{
             {
                 assert(parsePattern());
             }
-            //对msg格式化
+            //格式化方法1：输出到流
             void format(std::ostream& out, LogMsg& msg){
                 for (auto &item : _items) {
                     item->format(out, msg);
                 }
             }
+            //格式化方法2：返回字符串
             std::string format(LogMsg &msg) {
                 std::ostringstream out;
                 format(out, msg);
                 return out.str();
             }
             //对格式化字符串进行解析
+            /*
+            输入->[%d{%H:%M:%S}][%t][%c][%f:%l][%p]%T%m%n
+            输出->  {"", "["}           // 原始字符 [
+                    {"d", "%H:%M:%S"}   // 日期时间格式化，子规则为 %H:%M:%S
+                    {"", "]["}          // 原始字符 ][
+                    {"t", ""}           // 线程ID
+                    {"", "]["}          // 原始字符 ][
+                    {"c", ""}           // 日志器名称
+                    {"", "]["}          // 原始字符 ][
+                    {"f", ""}           // 文件名
+                    {"", ":"}           // 原始字符 :
+                    {"l", ""}           // 行号
+                    {"", "]["}          // 原始字符 ][
+                    {"p", ""}           // 日志级别
+                    {"", "]"}           // 原始字符 ]
+                    {"T", ""}           // 制表符
+                    {"m", ""}           // 日志消息
+                    {"n", ""}           // 换行符
+            */
             bool parsePattern(){
                 //1.对格式化字符串解析
                 std::vector<std::pair<std::string, std::string>> fmt_order;
@@ -170,21 +198,21 @@ namespace MySpace{
             }
         private:
             //根据不同的格式化字符创建不同的格式化子项对象
-            std::shared_ptr<FormatItem> createItem(const std::string &key, const std::string &val){
-                if (key == "d")  return std::make_shared<ctimeFormatItem>(val);
-                if (key == "t")  return std::make_shared<tidFormatItem>();
-                if (key == "c")  return std::make_shared<loggerFormatItem>();
-                if (key == "f")  return std::make_shared<fileFormatItem>();
-                if (key == "l")  return std::make_shared<lineFormatItem>();
-                if (key == "p")  return std::make_shared<levelFormatItem>();
-                if (key == "T")  return std::make_shared<TabFormatItem>();
-                if (key == "m")  return std::make_shared<payloadFormatItem>();
-                if (key == "n")  return std::make_shared<NewLineFormatItem>();
-                return std::make_shared<OtherFormatItem>(val);
+            std::unique_ptr<FormatItem> createItem(const std::string &key, const std::string &val){
+                if (key == "d")  return std::make_unique<ctimeFormatItem>(val);
+                if (key == "t")  return std::make_unique<tidFormatItem>();
+                if (key == "c")  return std::make_unique<loggerFormatItem>();
+                if (key == "f")  return std::make_unique<fileFormatItem>();
+                if (key == "l")  return std::make_unique<lineFormatItem>();
+                if (key == "p")  return std::make_unique<levelFormatItem>();
+                if (key == "T")  return std::make_unique<TabFormatItem>();
+                if (key == "m")  return std::make_unique<payloadFormatItem>();
+                if (key == "n")  return std::make_unique<NewLineFormatItem>();
+                return std::make_unique<OtherFormatItem>(val);
             }
         private:
             std::string _pattern;//格式化规则字符串
-            std::vector<std::shared_ptr<FormatItem>> _items;// 格式化子项数组
+            std::vector<std::unique_ptr<FormatItem>> _items;// 格式化子项数组
     };
 
 }

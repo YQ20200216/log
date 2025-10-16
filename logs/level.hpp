@@ -6,15 +6,7 @@ namespace MySpace
     class LogLevel
     {
     public:
-        enum value
-        {
-            DEBUG,
-            INFO,
-            WARN,
-            ERROR,
-            FATAL,
-            OFF
-        };
+        enum value { DEBUG, INFO, WARN, ERROR, FATAL, OFF };
 
         static const std::string toString(value level){
             switch (level){

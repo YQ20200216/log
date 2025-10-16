@@ -17,7 +17,7 @@ namespace MySpace {
         std::string _file;               // 源文件名称
         size_t _line;                    // 源文件行号
         std::thread::id _tid;            // 线程ID
-        std::string _payload;            // 有效载荷，日志主题消息
+        std::string _payload;            // 有效载荷，日志主体消息
         std::string _logger;             // 日志器
 
         LogMsg(LogLevel::value level

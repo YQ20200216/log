@@ -22,7 +22,7 @@ namespace MySpace
         // 2、获取文件目录
         static std::string getDirectory(const std::string& pathname)
         {
-            int pos = pathname.find_last_of("/\\");//查找斜杠或者反斜杠
+            size_t pos = pathname.find_last_of("/\\");//查找斜杠或者反斜杠
             if (pos == std::string::npos)//没找到
                 return std::string("./");
             return pathname.substr(0, pos + 1);
@@ -32,7 +32,6 @@ namespace MySpace
         {
             struct stat st;
             return (stat(pathname.c_str(), &st) == 0);
-            //return (access(pathname.c_str(), F_OK) == 0);//上面接口更广泛
         }
         // 4、创建一个目录
         static void createDirectory(const std::string& pathname){
