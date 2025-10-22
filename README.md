@@ -2,7 +2,7 @@
 
 ## 📋 项目概述
 
-这是一个基于 C++11 实现的轻量级、高性能日志系统，采用**木兰宽松许可证 v2（Mulan PSL v2）**开源。该项目采用纯头文件（Header-Only）方式实现，无需编译库文件，只需包含头文件即可使用。
+这是一个基于 C++14 实现的轻量级、高性能日志系统，采用**木兰宽松许可证 v2（Mulan PSL v2）**开源。该项目采用纯头文件（Header-Only）方式实现，无需编译库文件，只需包含头文件即可使用。
 
 ## ✨ 核心特性
 
@@ -11,8 +11,9 @@
 - **📦 模块化设计**：缓冲区、格式化器、落地模块、日志器等组件解耦，易于扩展
 - **🎯 灵活配置**：支持自定义日志格式、日志等级、多种输出方式
 - **💡 易于使用**：提供宏接口自动填充文件名和行号，简化日志记录
-- **📁 多种输出**：支持控制台输出、文件输出、按大小滚动的文件输出
+- **📁 多种输出**：支持控制台输出、文件输出、按大小滚动的文件输出、MySQL数据库输出
 - **🔧 Header-Only**：纯头文件实现，无需预编译，集成简单
+- **🗄️ 数据库支持**：可将日志直接写入MySQL数据库，便于集中管理和查询分析
 
 ## 🏗️ 架构设计
 
@@ -24,7 +25,7 @@
 | **LogLevel** | `level.hpp` | 定义日志等级（DEBUG/INFO/WARN/ERROR/FATAL/OFF） |
 | **LogMsg** | `message.hpp` | 封装日志消息对象（时间戳、等级、文件、行号等） |
 | **Formatter** | `format.hpp` | 格式化器，支持自定义日志输出格式 |
-| **Sink** | `sink.hpp` | 日志落地模块（标准输出、文件、滚动文件） |
+| **Sink** | `sink.hpp` | 日志落地模块（标准输出、文件、滚动文件、mysql数据库） |
 | **AsynchLooper** | `looper.hpp` | 异步工作器，双缓冲区+独立线程处理日志 |
 | **Logger** | `logger.hpp` | 日志器（同步/异步），日志器管理器 |
 | **Util** | `util.hpp` | 工具类（时间、文件路径、目录创建） |
@@ -60,7 +61,7 @@ log/
 │   ├── level.hpp            # 日志等级定义
 │   ├── message.hpp          # 日志消息封装
 │   ├── format.hpp           # 格式化器
-│   ├── sink.hpp             # 落地模块（控制台/文件/滚动文件）
+│   ├── sink.hpp             # 落地模块（控制台/文件/滚动文件/数据库）
 │   ├── looper.hpp           # 异步工作器
 │   ├── logger.hpp           # 日志器核心实现
 │   ├── util.hpp             # 工具函数
@@ -128,15 +129,26 @@ log/
 
 #### 6️⃣ sink.hpp - 落地模块
 - **难度**：⭐⭐⭐
-- **学习时间**：20-30分钟
-- **依赖**：level.hpp, util.hpp, message.hpp
+- **学习时间**：30-40分钟
+- **依赖**：level.hpp, util.hpp, message.hpp, MySQL Connector/C++（仅 MySQLSink）
 - **重点关注**：
   - `LogSink` 抽象基类
   - `StdoutSink` - 控制台输出（最简单）
   - `FileSink` - 文件输出
   - `RollBySizeSink` - 滚动文件（按大小切换）
+  - `MySQLSink` - 日志写入 MySQL 数据库（⭐重要）
+    - 使用 MySQL Connector/C++（非 C API）
+    - 数据库连接初始化（`sql::mysql::get_mysql_driver_instance()`）
+    - 日志表自动创建（含时间索引优化）
+    - 线程安全的日志插入（`std::mutex` 保护）
+    - PreparedStatement 防 SQL 注入
+    - 字符集自动设置为 utf8mb4
+    - `std::unique_ptr` 管理连接资源（RAII）
   - `SinkFactory` - 工厂模式创建 Sink
-- **学习建议**：按顺序看三个实现类，理解继承和多态的应用
+- **学习建议**：
+  1. 先看 StdoutSink（最简单）
+  2. 再看 FileSink 和 RollBySizeSink（理解文件操作）
+  3. 最后看 MySQLSink（最复杂，涉及数据库操作）
 
 ### 第二阶段：高级特性（3-4小时）
 
@@ -233,9 +245,40 @@ log/
 
 ### 1. 环境要求
 
-- **编译器**：支持 C++11 的编译器（GCC 4.8+、Clang 3.4+、MSVC 2015+）
+- **编译器**：支持 C++14 的编译器（GCC 5.0+、Clang 3.4+、MSVC 2015+）
 - **操作系统**：Linux、macOS、Windows
-- **依赖库**：pthread（Linux/macOS）
+- **必需依赖**：pthread（Linux/macOS，用于多线程支持）
+- **可选依赖**：MySQL Connector/C++ 8.0+（仅在使用MySQLSink时需要）
+
+#### MySQL Connector/C++ 安装方法
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install libmysqlcppconn-dev
+```
+
+**CentOS/RHEL:**
+```bash
+sudo yum install mysql-connector-c++-devel
+```
+
+**macOS (使用 Homebrew):**
+```bash
+brew install mysql-connector-c++
+```
+
+**从源码安装:**
+```bash
+# 下载 MySQL Connector/C++ 8.0+
+wget https://dev.mysql.com/get/Downloads/Connector-C++/mysql-connector-c++-8.0.x-src.tar.gz
+tar -xzf mysql-connector-c++-8.0.x-src.tar.gz
+cd mysql-connector-c++-8.0.x-src
+mkdir build && cd build
+cmake ..
+make
+sudo make install
+```
 
 ### 2. 获取源码
 
@@ -244,7 +287,23 @@ git clone <仓库地址>
 cd log
 ```
 
-### 3. 基础使用示例
+### 3. MySQL 数据库准备（可选）
+
+如果您需要使用 MySQLSink 将日志写入数据库，请先创建数据库：
+
+```sql
+-- 创建日志数据库
+CREATE DATABASE IF NOT EXISTS log_db DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 创建日志用户（建议使用专用账户）
+CREATE USER 'log_user'@'localhost' IDENTIFIED BY 'your_password';
+GRANT INSERT, CREATE ON log_db.* TO 'log_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+**注意**：日志表会由程序自动创建，无需手动创建表结构。
+
+### 4. 基础使用示例
 
 创建一个简单的测试文件 `test.cpp`：
 
@@ -266,6 +325,15 @@ int main() {
     builder->buildLoggerType(MySpace::LoggerType::LOGGER_SYNCH);
     builder->buildSink<MySpace::StdoutSink>();  // 标准输出
     builder->buildSink<MySpace::FileSink>("./logs/app.log");  // 文件输出
+    // 添加 MySQL 输出（请替换为你的数据库信息）
+    builder->buildSink<MySpace::MySQLSink>(
+        "localhost",    // 主机地址
+        "root",         // 用户名
+        "123456",       // 密码
+        "log_db",       // 数据库名
+        "app_logs",     // 表名（默认 logs）
+        3306            // 端口
+    );
     builder->build();
     
     // 使用自定义日志器
@@ -278,15 +346,25 @@ int main() {
 }
 ```
 
-### 4. 编译运行
+### 5. 编译运行
 
+#### 不使用 MySQL 功能
 ```bash
-# 编译（需要链接 pthread）
-g++ -std=c++11 -o test test.cpp -pthread -I./
-
-# 运行
+g++ -std=c++14 -o test test.cpp -pthread -I./
 ./test
 ```
+
+#### 使用 MySQL 功能
+```bash
+g++ -std=c++14 -o test test.cpp -pthread -I./ -lmysqlcppconn
+./test
+```
+
+#### 编译说明
+- `-std=c++14`：指定 C++14 标准（必需，因为使用了 `std::make_unique`）
+- `-pthread`：链接 pthread 库（多线程支持）
+- `-I./`：指定头文件搜索路径
+- `-lmysqlcppconn`：链接 MySQL Connector/C++ 库（仅使用 MySQLSink 时需要）
 
 ## 📝 详细使用指南
 
@@ -301,7 +379,49 @@ builder->buildLoggerLevel(MySpace::LogLevel::INFO);  // 只记录INFO及以上�
 builder->buildLoggerFormatter("[%d{%Y-%m-%d %H:%M:%S}][%p] %m%n");
 builder->buildLoggerType(MySpace::LoggerType::LOGGER_SYNCH);  // 同步模式
 builder->buildSink<MySpace::FileSink>("./logs/app.log");
+// 配置 MySQL 输出
+builder->buildSink<MySpace::MySQLSink>(
+    "db.example.com",  // 远程数据库地址
+    "log_user",        // 数据库用户（建议创建专用日志用户）
+    "log_pass",        // 用户密码
+    "logs_db",         // 数据库名称
+    "service_logs",    // 表名
+    3306               // 端口
+);
 builder->build();
+```
+
+#### MySQL 日志表结构
+
+程序会自动创建日志表，表结构如下：
+
+```sql
+CREATE TABLE IF NOT EXISTS 表名 (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,          -- 自增主键
+    log_content TEXT NOT NULL,                     -- 日志内容（完整格式化字符串）
+    log_time DATETIME NOT NULL,                    -- 日志写入时间（数据库服务器时间）
+    INDEX idx_log_time (log_time)                  -- 时间索引，优化查询
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**字段说明：**
+- `id`：自增主键，唯一标识每条日志
+- `log_content`：完整的格式化日志内容（包含时间、级别、文件名、行号、消息等）
+- `log_time`：日志写入数据库的时间（使用 `NOW()` 自动填充）
+- `idx_log_time`：基于时间的索引，优化按时间查询日志的性能
+
+**查询示例：**
+```sql
+-- 查询最近的100条日志
+SELECT * FROM service_logs ORDER BY log_time DESC LIMIT 100;
+
+-- 查询包含错误关键字的日志
+SELECT * FROM service_logs WHERE log_content LIKE '%ERROR%' ORDER BY log_time DESC;
+
+-- 查询指定时间范围的日志
+SELECT * FROM service_logs 
+WHERE log_time BETWEEN '2025-01-01 00:00:00' AND '2025-01-01 23:59:59'
+ORDER BY log_time DESC;
 ```
 
 ### 创建异步日志器
@@ -534,7 +654,7 @@ async_logger->info(__FILE__, __LINE__, "异步日志消息");
    │
    ├─ 【等待空间】(line 36)
    │   _produce_cond.wait(lock, [&]{ 
-   │       return _produce_buffer.writeAbleSize() >= len; 
+  │       return _produce_buffer.writeAbleSize() >= len; 
    │   })
    │   └─ 如果缓冲区满了，阻塞等待（通常不会发生）
    │
@@ -566,7 +686,7 @@ async_logger->info(__FILE__, __LINE__, "异步日志消息");
 2. 【等待数据】(line 48-50)
    ├─ std::unique_lock<std::mutex> lock(_mutex)
    ├─ _consumer_cond.wait(lock, [&]{ 
-   │       return (_stop || !_produce_buffer.bufferEmpty()); 
+  │       return (_stop || !_produce_buffer.bufferEmpty()); 
    │   })
    │   └─ 线程休眠，等待被唤醒...
    │
@@ -782,6 +902,90 @@ enum value {
 };
 ```
 
+### 场景6：MySQL 日志输出流程
+
+#### 代码示例
+```cpp
+// 创建包含 MySQLSink 的日志器
+std::vector<std::shared_ptr<LogSink>> sinks = {
+    std::make_shared<MySQLSink>("localhost", "root", "password", "log_db", "logs", 3306)
+};
+auto logger = LoggerFactory::createSynchLogger("mysql_logger", LogLevel::INFO, "", sinks);
+logger->info(__FILE__, __LINE__, "用户登录成功");
+```
+
+#### 执行流程
+```
+SynchLogger::log() (logger.hpp:86-92)
+    ↓
+遍历 _sinks 向量（包含 MySQLSink）
+    │
+    └─ sink->log(data, len)  // MySQLSink 实例
+        ↓
+MySQLSink::log() (sink.hpp:234-264)
+    │
+    ├─ 【步骤1】连接状态检查 (line 235-238)
+    │   if (!_connected || !_conn) 
+    │       └─ 输出错误信息到 stderr
+    │       └─ return（不写入日志）
+    │
+    ├─ 【步骤2】加锁保护 (line 239)
+    │   std::lock_guard<std::mutex> lock(_mutex)
+    │   └─ 确保多线程安全
+    │
+    ├─ 【步骤3】日志内容预处理 (line 242-245)
+    │   ├─ 构造 string: std::string log_content(data, 0, len)
+    │   └─ 去除末尾换行符: log_content.pop_back()
+    │       └─ 避免数据库中存储多余空行
+    │
+    ├─ 【步骤4】准备 SQL 语句 (line 247-249)
+    │   ├─ 使用 PreparedStatement（预编译语句）
+    │   └─ "INSERT INTO logs (log_content, log_time) VALUES (?, NOW())"
+    │       └─ ? 是参数占位符，防止 SQL 注入
+    │
+    ├─ 【步骤5】执行数据库插入 (line 250-254)
+    │   ├─ pstmt->setString(1, log_content)  → 绑定日志内容
+    │   │   └─ Connector/C++ 自动转义特殊字符
+    │   ├─ pstmt->executeUpdate()            → 执行 INSERT
+    │   │   └─ 数据写入 MySQL 表
+    │   └─ NOW() 自动填充 log_time 字段
+    │
+    └─ 【步骤6】异常处理 (line 255-258)
+        └─ catch (sql::SQLException &e)
+            ├─ 输出错误码: e.getErrorCode()
+            ├─ 输出错误信息: e.what()
+            └─ 程序继续运行（不崩溃）
+
+✅ 日志成功写入 MySQL 表！
+
+数据库记录示例：
+┌────┬──────────────────────────────────────────────┬─────────────────────┐
+│ id │ log_content                                  │ log_time            │
+├────┼──────────────────────────────────────────────┼─────────────────────┤
+│ 1  │ [12:30:45][140234567][mysql_logger]...      │ 2025-10-21 12:30:45 │
+└────┴──────────────────────────────────────────────┴─────────────────────┘
+```
+
+#### MySQL 特性说明
+
+1. **字符集处理**：
+   - 连接时自动执行 `SET NAMES utf8mb4`
+   - 支持中文、emoji 等所有 Unicode 字符
+
+2. **线程安全**：
+   - 使用 `std::lock_guard` 保护数据库操作
+   - 多线程环境下安全
+
+3. **资源管理**：
+   - 使用 `std::unique_ptr<sql::Connection>` 管理连接
+   - 析构时自动关闭连接
+   - 异常安全
+
+4. **性能优化建议**：
+   - 使用异步日志器（AsynchLogger）避免阻塞主线程
+   - 考虑使用连接池（在高并发场景）
+
+
 ---
 
 ### 核心流程总结图
@@ -854,8 +1058,18 @@ SynchLogger::log()      AsynchLogger::log()
 
 ```bash
 cd bench
-make
+
+# 编译基本版本（不包含 MySQL 支持）
+make bench
+
+# 编译包含 MySQL 支持的版本
+make bench-mysql
+
+# 运行测试
 ./bench
+
+# 清理生成的文件
+make clean
 ```
 
 ### 测试代码说明
@@ -889,8 +1103,11 @@ bench("async_logger", 10, 1000000, 100);
 // 在你的源文件中
 #include "path/to/log/logs/mylog.hpp"
 
-// 编译时添加头文件路径和 pthread
-g++ -std=c++11 your_app.cpp -pthread -I/path/to/log
+// 基本编译（不使用 MySQL）
+g++ -std=c++14 your_app.cpp -pthread -I/path/to/log
+
+// 使用 MySQL 功能
+g++ -std=c++14 your_app.cpp -pthread -I/path/to/log -lmysqlcppconn
 ```
 
 ### 方式2：子模块方式
@@ -907,6 +1124,52 @@ target_link_libraries(your_app pthread)
 ### 方式3：拷贝到项目中
 
 直接将 `logs/` 目录拷贝到你的项目中，然后包含头文件即可。
+
+## 💡 MySQL 使用最佳实践
+
+### 性能考虑
+
+1. **使用异步日志器**：MySQL 写入是 I/O 操作，强烈建议使用异步日志器避免阻塞主线程
+   ```cpp
+   // 推荐：异步写入 MySQL
+   auto logger = LoggerFactory::createAsynchLogger("mysql_logger", LogLevel::INFO);
+   ```
+
+2. **批量写入优化**：异步模式下，日志会先写入缓冲区，后台线程批量处理，大幅提升性能
+
+3. **索引优化**：日志表自动创建了 `log_time` 索引，按时间查询时性能较好
+
+### 连接管理
+
+- MySQLSink 会自动管理数据库连接
+- 连接失败时会输出错误信息到 stderr
+- 使用 `std::unique_ptr` 管理连接，确保资源正确释放
+- 字符集自动设置为 `utf8mb4`，支持中文和特殊字符
+
+### 安全建议
+
+1. **使用专用账户**：为日志系统创建专门的数据库用户，只授予必要的权限（INSERT、CREATE）
+2. **防止 SQL 注入**：使用 `PreparedStatement` 自动处理特殊字符
+3. **限制表大小**：定期清理或归档旧日志，避免表过大影响性能
+   ```sql
+   -- 删除30天前的日志
+   DELETE FROM logs WHERE log_time < DATE_SUB(NOW(), INTERVAL 30 DAY);
+   
+   -- 归档到历史表
+   INSERT INTO logs_archive SELECT * FROM logs WHERE log_time < DATE_SUB(NOW(), INTERVAL 30 DAY);
+   DELETE FROM logs WHERE log_time < DATE_SUB(NOW(), INTERVAL 30 DAY);
+   ```
+
+### 故障处理
+
+- 如果数据库连接失败，MySQLSink 会输出错误但不会崩溃程序
+- 建议同时配置文件输出作为备份：
+  ```cpp
+  std::vector<std::shared_ptr<LogSink>> sinks = {
+      std::make_shared<FileSink>("backup.log"),           // 备份到文件
+      std::make_shared<MySQLSink>("host", "user", "pass", "db")  // 主要存储
+  };
+  ```
 
 ## 📖 API 参考
 
@@ -972,6 +1235,49 @@ MySpace::FATAL("fmt", ...);
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 提交 Pull Request
+
+## ❓ 常见问题 (FAQ)
+
+### Q1: 为什么需要 C++14 标准？
+**A:** 项目使用了 `std::make_unique`（C++14引入）来管理 MySQL 连接等资源，确保异常安全和自动资源管理。
+
+### Q2: 不使用 MySQL 功能，是否需要安装 MySQL Connector/C++？
+**A:** 不需要。只有在代码中使用 `MySQLSink` 并在编译时链接 `-lmysqlcppconn` 时才需要安装。
+
+### Q3: MySQL 连接失败怎么办？
+**A:** 检查以下几点：
+- 数据库服务是否正常运行
+- 主机地址、端口、用户名、密码是否正确
+- 用户是否有相应权限（INSERT、CREATE）
+- 防火墙是否允许连接
+- 查看程序输出的错误信息（包含错误码和 SQLState）
+
+### Q4: 日志写入 MySQL 是否会影响程序性能？
+**A:** 使用异步日志器（`AsynchLogger`）可以避免主线程阻塞。日志会先写入内存缓冲区，由后台线程异步写入数据库，对主线程性能影响极小。
+
+### Q5: 如何查询 MySQL 中的日志？
+**A:** 使用标准 SQL 查询：
+```sql
+-- 按时间倒序查看最新日志
+SELECT * FROM logs ORDER BY log_time DESC LIMIT 100;
+
+-- 搜索包含特定关键字的日志
+SELECT * FROM logs WHERE log_content LIKE '%关键字%';
+
+-- 按时间范围查询
+SELECT * FROM logs WHERE log_time >= '2025-01-01' AND log_time < '2025-01-02';
+```
+
+### Q6: 日志表会无限增长吗？
+**A:** 是的，需要定期清理或归档旧日志。建议：
+- 使用定时任务（cron）定期删除或归档旧数据
+- 或者使用 MySQL 的分区表功能按时间自动管理
+
+### Q7: 支持其他数据库吗（如 PostgreSQL、SQLite）？
+**A:** 当前只支持 MySQL。如需支持其他数据库，可以参考 `MySQLSink` 的实现，创建自定义的 Sink 类。
+
+### Q8: 多个进程/程序可以写入同一个日志表吗？
+**A:** 可以。每个程序独立连接数据库，MySQL 会处理并发写入。建议使用不同的日志器名称以区分来源。
 
 ## 📄 开源协议
 

@@ -1,7 +1,7 @@
 // bench.cpp - 日志系统各场景测试
 // 展示了同步/异步日志器、多Sink输出、日志级别过滤等功能
 
-#include "../logs/mylog.hpp"
+#include "../logs/logger.hpp"
 #include <thread>
 #include <vector>
 #include <chrono>
@@ -70,7 +70,7 @@ void scenario2_syncLogging() {
     printInfo("测试不同级别的日志...");
     logger->debug(__FILE__, __LINE__, "调试信息：检查变量值");
     logger->info(__FILE__, __LINE__, "普通信息：用户登录成功");
-    logger->warn(__FILE__, __LINE__, "警告信息：内存使用率达到80%");
+    logger->warn(__FILE__, __LINE__, "警告信息：内存使用率达到80%%");
     logger->error(__FILE__, __LINE__, "错误信息：数据库连接失败");
     logger->fatal(__FILE__, __LINE__, "致命错误：系统崩溃");
     
