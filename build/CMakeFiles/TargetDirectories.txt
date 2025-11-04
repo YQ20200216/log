@@ -1,0 +1,2 @@
+/home/aaa/log/log/build/CMakeFiles/edit_cache.dir
+/home/aaa/log/log/build/CMakeFiles/rebuild_cache.dir
